@@ -69,13 +69,16 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    - name: Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+    
     - name: Deploy to EC2 with Kubernetes
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USERNAME }}
-        key: ${{ secrets.EC2_SSH_KEY }}
-        script: |
+      run: |
+        ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
           # Pull the latest Docker image
           docker pull st3el/student-task-manager:${{ github.sha }}
           docker pull st3el/student-task-manager:latest
@@ -88,14 +91,11 @@ jobs:
           
           # Verify deployment
           kubectl get pods -n student-tasks -l app=student-task-manager
+        EOF
         
     - name: Health check
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USERNAME }}
-        key: ${{ secrets.EC2_SSH_KEY }}
-        script: |
+      run: |
+        ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
           # Get service endpoint
           SERVICE_IP=$(kubectl get service student-task-manager-service -n student-tasks -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || kubectl get service student-task-manager-service -n student-tasks -o jsonpath='{.spec.clusterIP}')
           SERVICE_PORT=$(kubectl get service student-task-manager-service -n student-tasks -o jsonpath='{.spec.ports[0].port}')
@@ -110,3 +110,4 @@ jobs:
             kubectl get services -n student-tasks
             exit 1
           fi
+        EOF
