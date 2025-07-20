@@ -41,13 +41,21 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
     
-    - name: Build Docker image
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Build and push Docker image
       run: |
-        docker build -t student-task-manager:${{ github.sha }} .
+        docker build -t st3el/student-task-manager:${{ github.sha }} -t st3el/student-task-manager:latest .
+        docker push st3el/student-task-manager:${{ github.sha }}
+        docker push st3el/student-task-manager:latest
     
     - name: Test Docker container
       run: |
-        docker run -d --name test-container -p 5001:5000 student-task-manager:${{ github.sha }}
+        docker run -d --name test-container -p 5001:5000 st3el/student-task-manager:${{ github.sha }}
         sleep 10
         curl -f http://localhost:5001/health || exit 1
         docker stop test-container
@@ -61,12 +69,44 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Deploy to staging
-      run: |
-        echo "Deploying to staging environment..."
-        echo "Image: student-task-manager:${{ github.sha }}"
+    - name: Deploy to EC2 with Kubernetes
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # Pull the latest Docker image
+          docker pull st3el/student-task-manager:${{ github.sha }}
+          docker pull st3el/student-task-manager:latest
+          
+          # Update Kubernetes deployment with new image
+          kubectl set image deployment/student-task-manager student-task-manager=st3el/student-task-manager:${{ github.sha }} -n student-tasks
+          
+          # Wait for rollout to complete
+          kubectl rollout status deployment/student-task-manager -n student-tasks --timeout=300s
+          
+          # Verify deployment
+          kubectl get pods -n student-tasks -l app=student-task-manager
         
     - name: Health check
-      run: |
-        echo "Performing health check..."
-        echo "Deployment successful!"
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # Get service endpoint
+          SERVICE_IP=$(kubectl get service student-task-manager-service -n student-tasks -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || kubectl get service student-task-manager-service -n student-tasks -o jsonpath='{.spec.clusterIP}')
+          SERVICE_PORT=$(kubectl get service student-task-manager-service -n student-tasks -o jsonpath='{.spec.ports[0].port}')
+          
+          # Perform health check
+          if [ ! -z "$SERVICE_IP" ] && [ ! -z "$SERVICE_PORT" ]; then
+            echo "Performing health check on http://$SERVICE_IP:$SERVICE_PORT/health"
+            curl -f http://$SERVICE_IP:$SERVICE_PORT/health || exit 1
+            echo "Deployment successful!"
+          else
+            echo "Could not determine service endpoint"
+            kubectl get services -n student-tasks
+            exit 1
+          fi
