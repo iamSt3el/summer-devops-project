@@ -89,40 +89,19 @@ jobs:
           sudo systemctl start docker
           sudo chmod 666 /var/run/docker.sock
           
-          # Install kubectl if not present
-          if ! command -v kubectl &> /dev/null; then
-            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-            sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-            rm kubectl
-          fi
-          
-          # Install minikube if not present
-          if ! command -v minikube &> /dev/null; then
-            curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-            sudo install minikube-linux-amd64 /usr/local/bin/minikube
-            rm minikube-linux-amd64
-          fi
-          
-          # Start minikube if not running
-          if ! minikube status > /dev/null 2>&1; then
-            minikube start --driver=docker --force
-          fi
-          
-          # Configure kubectl for minikube
-          kubectl config use-context minikube
+          # Stop and remove existing container if running
+          docker stop student-task-manager || true
+          docker rm student-task-manager || true
           
           # Pull the latest Docker image
           docker pull st3el/student-task-manager:${{ github.sha }}
           docker pull st3el/student-task-manager:latest
           
-          # Update Kubernetes deployment with new image
-          kubectl set image deployment/student-task-manager student-task-manager=st3el/student-task-manager:${{ github.sha }} -n student-tasks
+          # Run the new container
+          docker run -d --name student-task-manager -p 80:5000 st3el/student-task-manager:${{ github.sha }}
           
-          # Wait for rollout to complete
-          kubectl rollout status deployment/student-task-manager -n student-tasks --timeout=300s
-          
-          # Verify deployment
-          kubectl get pods -n student-tasks -l app=student-task-manager
+          # Verify container is running
+          docker ps | grep student-task-manager
         
     - name: Health check
       uses: appleboy/ssh-action@v0.1.5
@@ -131,17 +110,10 @@ jobs:
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          # Get service endpoint
-          SERVICE_IP=$(kubectl get service student-task-manager-service -n student-tasks -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || kubectl get service student-task-manager-service -n student-tasks -o jsonpath='{.spec.clusterIP}')
-          SERVICE_PORT=$(kubectl get service student-task-manager-service -n student-tasks -o jsonpath='{.spec.ports[0].port}')
+          # Wait for container to be ready
+          sleep 10
           
-          # Perform health check
-          if [ ! -z "$SERVICE_IP" ] && [ ! -z "$SERVICE_PORT" ]; then
-            echo "Performing health check on http://$SERVICE_IP:$SERVICE_PORT/health"
-            curl -f http://$SERVICE_IP:$SERVICE_PORT/health || exit 1
-            echo "Deployment successful!"
-          else
-            echo "Could not determine service endpoint"
-            kubectl get services -n student-tasks
-            exit 1
-          fi
+          # Perform health check on the running container
+          echo "Performing health check on http://localhost:80/health"
+          curl -f http://localhost:80/health || exit 1
+          echo "Deployment successful!"
