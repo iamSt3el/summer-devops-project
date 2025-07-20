@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: student-task-manager-config
+  namespace: student-tasks
+data:
+  FLASK_ENV: "production"
+  APP_NAME: "Student Task Manager"
+  LOG_LEVEL: "INFO"
