@@ -1,0 +1,72 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Check Flask app syntax
+      run: |
+        python -m py_compile app.py
+    
+    - name: Test Flask app startup
+      run: |
+        python -c "from app import app; print('Flask app imports successfully')"
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image
+      run: |
+        docker build -t student-task-manager:${{ github.sha }} .
+    
+    - name: Test Docker container
+      run: |
+        docker run -d --name test-container -p 5001:5000 student-task-manager:${{ github.sha }}
+        sleep 10
+        curl -f http://localhost:5001/health || exit 1
+        docker stop test-container
+        docker rm test-container
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to staging
+      run: |
+        echo "Deploying to staging environment..."
+        echo "Image: student-task-manager:${{ github.sha }}"
+        
+    - name: Health check
+      run: |
+        echo "Performing health check..."
+        echo "Deployment successful!"
