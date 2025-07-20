@@ -85,12 +85,31 @@ jobs:
             sudo usermod -aG docker ec2-user
           fi
           
+          # Ensure Docker is running and user has permissions
+          sudo systemctl start docker
+          sudo chmod 666 /var/run/docker.sock
+          
           # Install kubectl if not present
           if ! command -v kubectl &> /dev/null; then
             curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
             sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
             rm kubectl
           fi
+          
+          # Install minikube if not present
+          if ! command -v minikube &> /dev/null; then
+            curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+            sudo install minikube-linux-amd64 /usr/local/bin/minikube
+            rm minikube-linux-amd64
+          fi
+          
+          # Start minikube if not running
+          if ! minikube status > /dev/null 2>&1; then
+            minikube start --driver=docker --force
+          fi
+          
+          # Configure kubectl for minikube
+          kubectl config use-context minikube
           
           # Pull the latest Docker image
           docker pull st3el/student-task-manager:${{ github.sha }}
