@@ -97,8 +97,13 @@ jobs:
           docker pull st3el/student-task-manager:${{ github.sha }}
           docker pull st3el/student-task-manager:latest
           
-          # Run the new container
-          docker run -d --name student-task-manager -p 80:5000 st3el/student-task-manager:${{ github.sha }}
+          # Run the new container with HTTPS
+          docker run -d --name student-task-manager \
+            -p 80:5000 \
+            -p 443:5443 \
+            -v /etc/letsencrypt:/etc/letsencrypt:ro \
+            -e DOMAIN=${{ secrets.DOMAIN_NAME }} \
+            st3el/student-task-manager:${{ github.sha }}
           
           # Verify container is running
           docker ps | grep student-task-manager
@@ -113,7 +118,11 @@ jobs:
           # Wait for container to be ready
           sleep 10
           
-          # Perform health check on the running container
+          # Perform health check on both HTTP and HTTPS
           echo "Performing health check on http://localhost:80/health"
           curl -f http://localhost:80/health || exit 1
+          
+          echo "Performing health check on https://localhost:443/health"
+          curl -k -f https://localhost:443/health || echo "HTTPS not available"
+          
           echo "Deployment successful!"
