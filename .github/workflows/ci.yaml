@@ -70,10 +70,10 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Deploy to EC2 with Kubernetes
-      uses: appleboy/ssh-action@v0.1.5
+      uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USERNAME }}
+        username: ec2-user
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
           # Pull the latest Docker image
