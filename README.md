@@ -2,6 +2,12 @@
 
 A modern Flask web application for managing student tasks with complete DevOps pipeline implementation.
 
+## 🌐 Live Application
+**URL:** [http://student-task-manager.duckdns.org](http://student-task-manager.duckdns.org)  
+**HTTPS:** [https://student-task-manager.duckdns.org](https://student-task-manager.duckdns.org)
+
+Deployed on AWS EC2 with automated CI/CD pipeline using GitHub Actions.
+
 ## Features
 - Create, update, and delete tasks
 - Priority levels (High, Medium, Low)
@@ -13,22 +19,19 @@ A modern Flask web application for managing student tasks with complete DevOps p
 
 ## DevOps Implementation
 
-### 1. Git and GitHub
-```bash
-# Initialize repository
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin <your-repo-url>
-git push -u origin main
-```
+### 🚀 CI/CD Pipeline
+Automated deployment using GitHub Actions with the following stages:
+- **Test**: Python syntax and Flask app validation
+- **Build**: Docker image creation and testing
+- **Deploy**: Automated deployment to AWS EC2
+- **Health Check**: Verification of successful deployment
 
-### 2. Docker Commands
+### 🐳 Docker
 ```bash
 # Build Docker image
 docker build -t student-task-manager:v1 .
 
-# Run container
+# Run container locally
 docker run -d -p 5000:5000 --name task-manager student-task-manager:v1
 
 # Using Docker Compose
@@ -36,7 +39,14 @@ docker-compose up -d
 docker-compose down
 ```
 
-### 3. Kubernetes Commands
+### ☁️ AWS EC2 Deployment
+- **Instance**: Amazon Linux 2 on EC2
+- **Domain**: student-task-manager.duckdns.org
+- **SSL**: Let's Encrypt certificates via Certbot
+- **Ports**: HTTP (80), HTTPS (443), SSH (22)
+- **Auto-scaling**: Container restart on deployment
+
+### 🔧 Local Kubernetes Development
 ```bash
 # Apply all manifests
 kubectl apply -f k8s/
@@ -51,50 +61,18 @@ kubectl scale deployment student-task-manager --replicas=5 -n student-tasks
 
 # Port forwarding
 kubectl port-forward service/student-task-manager-service 8080:80 -n student-tasks
-
-# Check logs
-kubectl logs -l app=student-task-manager -n student-tasks
-```
-
-### 4. Minikube Setup
-```bash
-# Start minikube
-minikube start
-
-# Enable ingress
-minikube addons enable ingress
-
-# Build image in minikube
-eval $(minikube docker-env)
-docker build -t student-task-manager:latest .
-
-# Access service
-minikube service student-task-manager-service -n student-tasks
-```
-
-### 5. GCP/GKE Commands
-```bash
-# Create GKE cluster
-gcloud container clusters create student-tasks-cluster --num-nodes=3
-
-# Get credentials
-gcloud container clusters get-credentials student-tasks-cluster
-
-# Build and push to Container Registry
-docker tag student-task-manager:latest gcr.io/YOUR_PROJECT_ID/student-task-manager:latest
-docker push gcr.io/YOUR_PROJECT_ID/student-task-manager:latest
 ```
 
 ## Project Structure
 ```
 ├── app.py                 # Main Flask application
 ├── requirements.txt       # Python dependencies
-├── Dockerfile            # Container definition
+├── Dockerfile            # Container definition with HTTPS support
 ├── docker-compose.yaml   # Multi-container setup
 ├── .github/
 │   └── workflows/
-│       └── ci.yaml       # CI/CD pipeline
-├── k8s/                  # Kubernetes manifests
+│       └── ci.yaml       # GitHub Actions CI/CD pipeline
+├── k8s/                  # Kubernetes manifests (for local dev)
 │   ├── namespace.yaml
 │   ├── deployment.yaml
 │   ├── service.yaml
@@ -104,3 +82,20 @@ docker push gcr.io/YOUR_PROJECT_ID/student-task-manager:latest
     ├── base.html
     └── index.html
 ```
+
+## 🛠️ Tech Stack
+- **Backend**: Flask (Python)
+- **Frontend**: HTML, Bootstrap CSS
+- **Containerization**: Docker
+- **Orchestration**: Kubernetes (local development)
+- **Cloud**: AWS EC2
+- **CI/CD**: GitHub Actions
+- **SSL**: Let's Encrypt (Certbot)
+- **Domain**: DuckDNS
+- **Registry**: Docker Hub
+
+## 📈 Monitoring & Health
+- Health check endpoint: `/health`
+- Container health monitoring
+- Automated deployment verification
+- SSL certificate auto-renewal
